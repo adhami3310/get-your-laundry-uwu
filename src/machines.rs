@@ -5,7 +5,7 @@ use std::{
 };
 
 use itertools::{Either, Itertools};
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_serial::SerialPortBuilderExt;
@@ -20,17 +20,10 @@ pub enum PowerStatus {
     On,
 }
 
-fn serialize_last_updated<S>(last_updated: &Instant, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serde_millis::serialize(&Instant::now().duration_since(*last_updated), serializer)
-}
-
 #[derive(Serialize, Clone, Copy, Debug)]
 struct State {
     power_status: PowerStatus,
-    #[serde(serialize_with = "serialize_last_updated")]
+    #[serde(serialize_with = "crate::serialize_instant_to_duration_since")]
     #[serde(rename = "since_updated")]
     last_updated: Instant,
 }
@@ -84,6 +77,9 @@ pub struct Machines<const T: usize> {
     #[serde(with = "serde_arrays")]
     status: [Arc<Mutex<State>>; T],
 
+    #[serde(with = "serde_arrays")]
+    latest_values: [Arc<Mutex<f32>>; T],
+
     email_requests: Arc<Mutex<Vec<EmailRequest>>>,
 }
 
@@ -109,12 +105,23 @@ impl<const T: usize> Machines<T> {
         baud_rate: u32,
         thresholds: [Thresholds; T],
     ) -> Self {
-        let mut serial_port = tokio_serial::new(path, baud_rate)
-            .timeout(Duration::from_secs(1))
-            .open_native_async()
-            .unwrap_or_else(|_| panic!("Cannot Open Serial Port: {}", path));
+        let serial_port = {
+            let mut serial_port = loop {
+                match tokio_serial::new(path, baud_rate)
+                    .timeout(Duration::from_secs(5))
+                    .open_native_async()
+                {
+                    Ok(s) => break s,
+                    _ => continue,
+                }
+            };
 
-        serial_port.set_exclusive(false).unwrap();
+            serial_port.set_exclusive(false).unwrap();
+
+            serial_port
+        };
+
+        println!("Aquired {path}");
 
         let mut reader = BufReader::new(serial_port);
 
@@ -126,20 +133,29 @@ impl<const T: usize> Machines<T> {
         let email_requests = Arc::new(Mutex::new(Vec::<EmailRequest>::new()));
         let thread_email_requests = email_requests.clone();
 
+        let latest_values: [Arc<Mutex<f32>>; T] = array::from_fn(|_| Default::default());
+        let thread_latest_values = latest_values.clone();
+
         tokio::spawn(async move {
             let mut line = String::new();
             let mut values: [Vec<(f32, Instant)>; T] = array::from_fn(|_| Vec::new());
             while reader.read_line(&mut line).await.is_ok() {
-                if let Ok(one_line) = line
-                    .trim()
-                    .split(' ')
-                    .filter_map(|v| v.parse::<f32>().ok())
-                    .collect::<Vec<_>>()
-                    .try_into()
-                {
+                if let Ok(one_line) = TryInto::<[f32; T]>::try_into(
+                    line.trim()
+                        .split(' ')
+                        .filter_map(|v| v.parse::<f32>().ok())
+                        .collect::<Vec<_>>(),
+                ) {
+                    one_line
+                        .iter()
+                        .zip(thread_latest_values.clone())
+                        .for_each(|(v, t)| {
+                            *t.lock().unwrap() = *v;
+                        });
+
                     values
                         .iter_mut()
-                        .zip::<[f32; T]>(one_line)
+                        .zip(one_line)
                         .for_each(|(a, v)| a.push((v, Instant::now())));
 
                     values
@@ -241,6 +257,7 @@ impl<const T: usize> Machines<T> {
             name,
             status,
             email_requests,
+            latest_values,
         }
     }
 

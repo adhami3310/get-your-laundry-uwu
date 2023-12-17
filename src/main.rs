@@ -1,6 +1,6 @@
 mod machines;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use axum::{
     extract::State,
@@ -14,6 +14,9 @@ use tower_http::services::ServeDir;
 
 #[derive(Serialize, Clone)]
 struct AppState {
+    #[serde(serialize_with = "crate::serialize_instant_to_duration_since")]
+    #[serde(rename = "uptime")]
+    server_started: Instant,
     washers: Arc<Machines<3>>,
     dryers: Arc<Machines<4>>,
 }
@@ -21,6 +24,7 @@ struct AppState {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let state = AppState {
+        server_started: Instant::now(),
         washers: Machines::new(
             "Washer",
             "/dev/ttyUSB1",
@@ -49,7 +53,9 @@ async fn main() {
         .nest_service("/", ServeDir::new("public"))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -93,4 +99,14 @@ async fn email(State(state): State<AppState>, Json(payload): Json<NotifyEmail>) 
         kerb,
         indicies: washers,
     });
+}
+
+pub fn serialize_instant_to_duration_since<S>(
+    last_updated: &Instant,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serde_millis::serialize(&Instant::now().duration_since(*last_updated), serializer)
 }
