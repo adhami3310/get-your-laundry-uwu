@@ -90,9 +90,9 @@ fn analyze_values(values: &[f32], cutoff: u64) -> PowerStatus {
         .sorted()
         .collect_vec();
 
-    let median = values[values.len() / 2];
+    let large_median = values[values.len() - 1 - (values.len() / 4)];
 
-    match median {
+    match large_median {
         x if x < cutoff => PowerStatus::Off,
         _ => PowerStatus::On,
     }
