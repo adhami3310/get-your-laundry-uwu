@@ -510,7 +510,8 @@
                         return `${Math.floor(time / (60 * 24))}d`;
                     }
 
-                    document.getElementById("time").innerText = "Server Uptime: " + timeDisplay(json["uptime"] / 1000 / 60);
+                    // document.getElementById("time").innerText = "Server Uptime: " + timeDisplay(json["uptime"] / 1000 / 60);\
+                    console.log(json["uptime"]);
                     const dryers = json["dryers"].status;
                     const washers = json["washers"].status;
                     for (let i = 1; i <= dryers.length; i++) {
