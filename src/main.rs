@@ -38,7 +38,7 @@ async fn main() {
     // build our application with a single route
     let app = Router::new()
         .route("/watch", get(handler))
-        .nest_service("/", ServeDir::new("static"))
+        .nest_service("/", ServeDir::new("public"))
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
