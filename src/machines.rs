@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use serde::{Serialize, Serializer};
 use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -71,10 +71,20 @@ impl Default for Thresholds {
     }
 }
 
+#[derive(Serialize, Clone)]
+pub struct EmailRequest {
+    pub kerb: String,
+    pub indicies: Vec<usize>,
+}
+
 #[derive(Serialize)]
 pub struct Machines<const T: usize> {
+    name: &'static str,
+
     #[serde(with = "serde_arrays")]
     status: [Arc<Mutex<State>>; T],
+
+    email_requests: Arc<Mutex<Vec<EmailRequest>>>,
 }
 
 fn analyze_values(values: &[f32], cutoff: u64) -> PowerStatus {
@@ -93,7 +103,12 @@ fn analyze_values(values: &[f32], cutoff: u64) -> PowerStatus {
 }
 
 impl<const T: usize> Machines<T> {
-    pub fn new(path: &str, baud_rate: u32, thresholds: [Thresholds; T]) -> Self {
+    pub fn new(
+        name: &'static str,
+        path: &str,
+        baud_rate: u32,
+        thresholds: [Thresholds; T],
+    ) -> Self {
         let mut serial_port = tokio_serial::new(path, baud_rate)
             .timeout(Duration::from_secs(1))
             .open_native_async()
@@ -107,6 +122,9 @@ impl<const T: usize> Machines<T> {
             std::array::from_fn(|i| Arc::new(Mutex::new(State::new(thresholds[i].forced_state))));
 
         let thread_status = status.clone();
+
+        let email_requests = Arc::new(Mutex::new(Vec::<EmailRequest>::new()));
+        let thread_email_requests = email_requests.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
@@ -128,7 +146,8 @@ impl<const T: usize> Machines<T> {
                         .iter_mut()
                         .zip(thresholds.iter())
                         .zip(thread_status.iter())
-                        .for_each(|((v, t), status)| {
+                        .enumerate()
+                        .for_each(|(i, ((v, t), status))| {
                             if t.forced_state.is_some() {
                                 v.clear();
                                 return;
@@ -158,6 +177,55 @@ impl<const T: usize> Machines<T> {
                                 if old_value.power_status != new {
                                     old_value.power_status = new;
                                     old_value.last_updated = Instant::now();
+
+                                    let mut requests = thread_email_requests.lock().unwrap();
+
+                                    let (to_send, new_requests): (Vec<_>, Vec<_>) =
+                                        requests.iter().partition_map(|r| {
+                                            if r.indicies.contains(&i) {
+                                                Either::Left(r.kerb.clone())
+                                            } else {
+                                                Either::Right(r.to_owned())
+                                            }
+                                        });
+
+                                    let email_builder = lettre::Message::builder()
+                                        .from("Laundry <laundry@mit.edu>".parse().unwrap())
+                                        .subject(format!(
+                                            "{name} is {} EOM",
+                                            match new {
+                                                PowerStatus::Broken => "broken",
+                                                PowerStatus::Off => "off",
+                                                PowerStatus::On => "on",
+                                                PowerStatus::Unknown => "unknown",
+                                            }
+                                        ))
+                                        .header(lettre::message::header::ContentType::TEXT_PLAIN);
+
+                                    // Open a remote connection to mit.edu
+                                    let mailer = lettre::SmtpTransport::relay("outgoing.mit.edu")
+                                        .unwrap()
+                                        .credentials(lettre::transport::smtp::authentication::Credentials::new(
+                                            std::env::var("SMTP_USERNAME").unwrap(),
+                                            std::env::var("SMTP_PASSWORD").unwrap(),
+                                        ))
+                                        .build();
+
+                                    for kerb in to_send {
+                                        let email = email_builder
+                                            .clone()
+                                            .to(lettre::message::Mailbox::new(
+                                                None,
+                                                lettre::Address::new(kerb, "mit.edu").unwrap(),
+                                            ))
+                                            .body(lettre::message::Body::new(vec![]))
+                                            .unwrap();
+
+                                        // Send the email
+                                        let _ = lettre::Transport::send(&mailer, &email);
+                                    }
+
+                                    *requests = new_requests;
                                 }
 
                                 v.clear();
@@ -169,6 +237,15 @@ impl<const T: usize> Machines<T> {
             }
         });
 
-        Self { status }
+        Self {
+            name,
+            status,
+            email_requests,
+        }
+    }
+
+    pub fn add_request(&self, request: EmailRequest) {
+        let mut email_request = self.email_requests.lock().unwrap();
+        email_request.push(request);
     }
 }

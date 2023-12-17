@@ -211,7 +211,7 @@
             visibility: hidden;
         }
 
-        input[type=email] {
+        input[name=kerb] {
             flex: 1;
             font-family: inherit;
             appearance: none;
@@ -223,12 +223,12 @@
             font-size: inherit;
         }
 
-        input[type=email]::placeholder {
+        input[name=kerb]::placeholder {
             color: var(--on-surface-variant);
         }
 
-        input[type=email]:active,
-        input[type=email]:focus {
+        input[name=kerb]:active,
+        input[name=kerb]:focus {
             outline: none;
             border: 1px solid var(--primary);
             border-radius: 100em;
@@ -449,46 +449,46 @@
         }
     </style>
     <script>
-        function ask(email, machines) {
+        function ask(kerb, machines) {
             fetch('/notify', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ email: email, machines: machines })
+                body: JSON.stringify({ kerb, machines })
             });
         }
 
         function notify() {
-            const email = document.querySelector("input[type=email]");
+            const kerb = document.querySelector("input[name=kerb]");
             const option = document.querySelector(".selection .active").id;
             const type = document.querySelector(".types .active").id;
             if (type === "first") {
                 if (option === "selected") {
-                    ask(email.value, sub.map(machine => {
+                    ask(kerb.value, sub.map(machine => {
                         const machineType = machine.substring(0, machine.length - 1);
                         const machineIndex = Number.parseInt(machine.substring(machine.length - 1));
                         return { machine: machineType, index: machineIndex - 1 };
                     }));
                 } else if (option === "dryers") {
-                    ask(email.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }, { machine: "dryer", index: 3 }])
+                    ask(kerb.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }, { machine: "dryer", index: 3 }])
                 } else if (option === "washers") {
-                    ask(email.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }]);
+                    ask(kerb.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }]);
                 }
             } else {
                 if (option === "selected") {
                     sub.forEach(machine => {
                         const machineType = machine.substring(0, machine.length - 1);
                         const machineIndex = Number.parseInt(machine.substring(machine.length - 1));
-                        ask(email.value, [{ machine: machine, index: machineIndex }]);
+                        ask(kerb.value, [{ machine: machine, index: machineIndex }]);
                     });
                 } else if (option === "dryers") {
                     for (let i = 0; i < 4; i += 1) {
-                        ask(email.value, [{ machine: "dryer", index: i }]);
+                        ask(kerb.value, [{ machine: "dryer", index: i }]);
                     }
                 } else if (option === "washers") {
                     for (let i = 0; i < 3; i += 1) {
-                        ask(email.value, [{ machine: "washer", index: i }]);
+                        ask(kerb.value, [{ machine: "washer", index: i }]);
                     }
                 }
             }
@@ -589,7 +589,7 @@
                 <form name="notifications">
                     <div class="email">
                         <span class="symbol mail"></span>
-                        <input name="email" type="email" placeholder="jarthur@mit.edu" required />
+                        <input name="kerb" type="text" placeholder="jarthur@mit.edu" required />
                     </div>
                     <div class="selection sigment-container">
                         <button type="button" class="sigment selected" id="selected"><span
