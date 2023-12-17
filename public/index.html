@@ -511,7 +511,6 @@
                     }
 
                     document.getElementById("uptime").innerText = "Server Uptime: " + timeDisplay(Math.floor(json["uptime"] / 1000 / 60));
-                    console.log(json["uptime"]);
                     const dryers = json["dryers"].status;
                     const washers = json["washers"].status;
                     for (let i = 1; i <= dryers.length; i++) {
