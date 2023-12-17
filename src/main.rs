@@ -5,6 +5,7 @@ use std::sync::Arc;
 use axum::{extract::State, routing::get, Json, Router};
 use machines::Machines;
 use serde::Serialize;
+use tower_http::services::ServeDir;
 
 #[derive(Serialize, Clone)]
 struct AppState {
@@ -37,6 +38,7 @@ async fn main() {
     // build our application with a single route
     let app = Router::new()
         .route("/watch", get(handler))
+        .nest_service("/", ServeDir::new("static"))
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000

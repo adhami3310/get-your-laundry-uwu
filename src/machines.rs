@@ -1,29 +1,37 @@
 use std::{
     array,
-    ops::Div,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
 use itertools::Itertools;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_serial::SerialPortBuilderExt;
 
+#[allow(dead_code)]
 #[derive(Default, PartialEq, Eq, Serialize, Clone, Copy, Debug)]
 pub enum PowerStatus {
     #[default]
-    NoClue,
+    Unknown,
     Broken,
     Off,
     On,
 }
 
+fn serialize_last_updated<S>(last_updated: &Instant, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serde_millis::serialize(&Instant::now().duration_since(*last_updated), serializer)
+}
+
 #[derive(Serialize, Clone, Copy, Debug)]
 struct State {
     power_status: PowerStatus,
-    #[serde(with = "serde_millis")]
+    #[serde(serialize_with = "serialize_last_updated")]
+    #[serde(rename = "since_updated")]
     last_updated: Instant,
 }
 
@@ -47,7 +55,8 @@ impl State {
 
 pub struct Thresholds {
     pub forced_state: Option<PowerStatus>,
-    pub scan_duration: Duration,
+    pub off_scan_duration: Duration,
+    pub on_scan_duration: Duration,
     pub cutoff: u64,
 }
 
@@ -55,7 +64,8 @@ impl Default for Thresholds {
     fn default() -> Self {
         Self {
             forced_state: None,
-            scan_duration: Duration::from_secs(60),
+            off_scan_duration: Duration::from_secs(30),
+            on_scan_duration: Duration::from_secs(60 * 5),
             cutoff: 700,
         }
     }
@@ -67,34 +77,16 @@ pub struct Machines<const T: usize> {
     status: [Arc<Mutex<State>>; T],
 }
 
-pub trait Mean: Sized {
-    fn mean<A>(self) -> A
-    where
-        Self: Iterator<Item = A>,
-        A: std::iter::Sum<A> + Div<A, Output = A> + Default + TryFrom<usize>,
-        <A as TryFrom<usize>>::Error: std::fmt::Debug,
-    {
-        let i = self.collect_vec();
-        let len = i.len().try_into().unwrap();
-        i.into_iter()
-            .sum1::<A>()
-            .map(|v| v / len)
-            .unwrap_or_default()
-    }
-}
-
-impl<T: std::iter::Iterator<Item = u64>> Mean for T {}
-
 fn analyze_values(values: &[f32], cutoff: u64) -> PowerStatus {
-    match values
-        .into_iter()
+    let values = values
+        .iter()
         .map(|v| (1000. * v).trunc() as u64)
         .sorted()
-        .skip(2)
-        .rev()
-        .skip(2)
-        .mean()
-    {
+        .collect_vec();
+
+    let median = values[values.len() / 2];
+
+    match median {
         x if x < cutoff => PowerStatus::Off,
         _ => PowerStatus::On,
     }
@@ -102,10 +94,12 @@ fn analyze_values(values: &[f32], cutoff: u64) -> PowerStatus {
 
 impl<const T: usize> Machines<T> {
     pub fn new(path: &str, baud_rate: u32, thresholds: [Thresholds; T]) -> Self {
-        let serial_port = tokio_serial::new(path, baud_rate)
+        let mut serial_port = tokio_serial::new(path, baud_rate)
             .timeout(Duration::from_secs(1))
             .open_native_async()
-            .expect(&format!("Cannot Open Serial Port: {}", path));
+            .unwrap_or_else(|_| panic!("Cannot Open Serial Port: {}", path));
+
+        serial_port.set_exclusive(false).unwrap();
 
         let mut reader = BufReader::new(serial_port);
 
@@ -117,8 +111,9 @@ impl<const T: usize> Machines<T> {
         tokio::spawn(async move {
             let mut line = String::new();
             let mut values: [Vec<(f32, Instant)>; T] = array::from_fn(|_| Vec::new());
-            while let Ok(_) = reader.read_line(&mut line).await {
+            while reader.read_line(&mut line).await.is_ok() {
                 if let Ok(one_line) = line
+                    .trim()
                     .split(' ')
                     .filter_map(|v| v.parse::<f32>().ok())
                     .collect::<Vec<_>>()
@@ -134,12 +129,25 @@ impl<const T: usize> Machines<T> {
                         .zip(thresholds.iter())
                         .zip(thread_status.iter())
                         .for_each(|((v, t), status)| {
+                            if t.forced_state.is_some() {
+                                v.clear();
+                                return;
+                            }
+
                             let Some((_, time_of_first_record)) = v.first() else {
                                 return;
                             };
 
+                            let old_state = {
+                                let status = status.lock().unwrap();
+                                status.power_status
+                            };
+
                             if Instant::now().duration_since(*time_of_first_record)
-                                >= t.scan_duration
+                                >= match old_state {
+                                    PowerStatus::On => t.on_scan_duration,
+                                    _ => t.off_scan_duration,
+                                }
                             {
                                 let (values, _): (Vec<_>, Vec<_>) = v.iter().cloned().unzip();
 
@@ -147,9 +155,9 @@ impl<const T: usize> Machines<T> {
 
                                 let mut old_value = status.lock().unwrap();
 
-                                if (*old_value).power_status != new {
-                                    (*old_value).power_status = new;
-                                    (*old_value).last_updated = Instant::now();
+                                if old_value.power_status != new {
+                                    old_value.power_status = new;
+                                    old_value.last_updated = Instant::now();
                                 }
 
                                 v.clear();
