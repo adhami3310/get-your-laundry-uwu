@@ -504,6 +504,8 @@
                 json => {
                     const dryers = json["dryers"].status;
                     const washers = json["washers"].status;
+                    console.log(dryers);
+                    console.log(washers);
                     for (let i = 1; i <= dryers.count; i++) {
                         document.getElementById(`dryer${i}`).state = dryers[i - 1].power_status;
                         document.getElementById(`dryer${i}`).transition = Date.now() - dryers[i - 1].since_updated;
