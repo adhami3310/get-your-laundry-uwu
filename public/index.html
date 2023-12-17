@@ -504,14 +504,12 @@
                 json => {
                     const dryers = json["dryers"].status;
                     const washers = json["washers"].status;
-                    console.log(dryers);
-                    console.log(washers);
-                    for (let i = 1; i <= dryers.count; i++) {
+                    for (let i = 1; i <= dryers.length; i++) {
                         document.getElementById(`dryer${i}`).state = dryers[i - 1].power_status;
                         document.getElementById(`dryer${i}`).transition = Date.now() - dryers[i - 1].since_updated;
                         document.getElementById(`dryer${i}`).classList.remove("loading");
                     }
-                    for (let i = 1; i <= washers.count; i++) {
+                    for (let i = 1; i <= washers.length; i++) {
                         document.getElementById(`washer${i}`).state = washers[i - 1].power_status;
                         document.getElementById(`washer${i}`).transition = Date.now() - washers[i - 1].since_updated;
                         document.getElementById(`washer${i}`).classList.remove("loading");
