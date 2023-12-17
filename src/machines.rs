@@ -203,13 +203,11 @@ impl<const T: usize> Machines<T> {
                                         .header(lettre::message::header::ContentType::TEXT_PLAIN);
 
                                     // Open a remote connection to mit.edu
-                                    let mailer = lettre::SmtpTransport::relay("outgoing.mit.edu")
-                                        .unwrap()
-                                        .credentials(lettre::transport::smtp::authentication::Credentials::new(
-                                            std::env::var("SMTP_USERNAME").unwrap(),
-                                            std::env::var("SMTP_PASSWORD").unwrap(),
-                                        ))
-                                        .build();
+
+                                    let mailer = lettre::SmtpTransport::builder_dangerous(
+                                        "outgoing.mit.edu",
+                                    )
+                                    .build();
 
                                     for kerb in to_send {
                                         let email = email_builder
@@ -222,7 +220,9 @@ impl<const T: usize> Machines<T> {
                                             .unwrap();
 
                                         // Send the email
-                                        let _ = lettre::Transport::send(&mailer, &email);
+                                        if let Err(e) = lettre::Transport::send(&mailer, &email) {
+                                            println!("{}", e);
+                                        }
                                     }
 
                                     *requests = new_requests;
