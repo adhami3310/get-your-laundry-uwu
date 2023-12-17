@@ -71,6 +71,11 @@ pub struct EmailRequest {
 }
 
 #[derive(Serialize)]
+pub struct Timestamp(
+    #[serde(serialize_with = "crate::serialize_instant_to_duration_since")] Instant,
+);
+
+#[derive(Serialize)]
 pub struct Machines<const T: usize> {
     name: &'static str,
 
@@ -79,6 +84,9 @@ pub struct Machines<const T: usize> {
 
     #[serde(with = "serde_arrays")]
     latest_values: [Arc<Mutex<f32>>; T],
+
+    #[serde(rename = "since_updated")]
+    time_stamp: Arc<Mutex<Timestamp>>,
 
     email_requests: Arc<Mutex<Vec<EmailRequest>>>,
 }
@@ -136,6 +144,9 @@ impl<const T: usize> Machines<T> {
         let latest_values: [Arc<Mutex<f32>>; T] = array::from_fn(|_| Default::default());
         let thread_latest_values = latest_values.clone();
 
+        let time_stamp = Arc::new(Mutex::new(Timestamp(Instant::now())));
+        let thread_time_stamp = time_stamp.clone();
+
         tokio::spawn(async move {
             let mut line = String::new();
             let mut values: [Vec<(f32, Instant)>; T] = array::from_fn(|_| Vec::new());
@@ -148,10 +159,12 @@ impl<const T: usize> Machines<T> {
                 ) {
                     one_line
                         .iter()
-                        .zip(thread_latest_values.clone())
+                        .zip(&thread_latest_values)
                         .for_each(|(v, t)| {
                             *t.lock().unwrap() = *v;
                         });
+
+                    *thread_time_stamp.lock().unwrap() = Timestamp(Instant::now());
 
                     values
                         .iter_mut()
@@ -258,6 +271,7 @@ impl<const T: usize> Machines<T> {
             status,
             email_requests,
             latest_values,
+            time_stamp,
         }
     }
 
