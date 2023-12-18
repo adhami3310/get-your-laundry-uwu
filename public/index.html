@@ -524,7 +524,7 @@
                         document.getElementById(`washer${i}`).classList.remove("loading");
                     }
                 }
-            )
+            ).catch(_ => { })
         }
         updateMachines();
         setInterval(updateMachines, 5000);
