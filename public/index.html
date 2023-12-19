@@ -466,30 +466,30 @@
             if (type === "first") {
                 if (option === "selected") {
                     ask(kerb.value, sub.map(machine => {
-                        const machineType = machine.substring(0, machine.length - 1);
-                        const machineIndex = Number.parseInt(machine.substring(machine.length - 1));
-                        return { machine: machineType, index: machineIndex - 1 };
+                        const machine = machine.substring(0, machine.length - 1);
+                        const index = Number.parseInt(machine.substring(machine.length - 1));
+                        return { machine, index };
                     }));
                 } else if (option === "dryers") {
-                    ask(kerb.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }, { machine: "dryer", index: 3 }])
+                    ask(kerb.value, [0, 1, 2, 3].map(index => ({ machine: "dryer", index })))
                 } else if (option === "washers") {
-                    ask(kerb.value, [{ machine: "dryer", index: 0 }, { machine: "dryer", index: 1 }, { machine: "dryer", index: 2 }]);
+                    ask(kerb.value, [0, 1, 2].map(index => ({ machine: "washer", index })))
                 }
             } else {
                 if (option === "selected") {
                     sub.forEach(machine => {
-                        const machineType = machine.substring(0, machine.length - 1);
-                        const machineIndex = Number.parseInt(machine.substring(machine.length - 1));
-                        ask(kerb.value, [{ machine: machine, index: machineIndex }]);
+                        const machine = machine.substring(0, machine.length - 1);
+                        const index = Number.parseInt(machine.substring(machine.length - 1));
+                        ask(kerb.value, [{ machine, index }]);
                     });
                 } else if (option === "dryers") {
-                    for (let i = 0; i < 4; i += 1) {
-                        ask(kerb.value, [{ machine: "dryer", index: i }]);
-                    }
+                    [0, 1, 2, 3].forEach(index => {
+                        ask(kerb.value, [{ machine: "dryer", index }]);
+                    });
                 } else if (option === "washers") {
-                    for (let i = 0; i < 3; i += 1) {
-                        ask(kerb.value, [{ machine: "washer", index: i }]);
-                    }
+                    [0, 1, 2].forEach(index => {
+                        ask(kerb.value, [{ machine: "washer", index }]);
+                    });
                 }
             }
             showSnackbar();
@@ -513,16 +513,18 @@
                     document.getElementById("uptime").innerText = "Server Uptime: " + timeDisplay(Math.floor(json["uptime"] / 1000 / 60));
                     const dryers = json["dryers"].status;
                     const washers = json["washers"].status;
-                    for (let i = 1; i <= dryers.length; i++) {
-                        document.getElementById(`dryer${i}`).state = dryers[i - 1].power_status;
-                        document.getElementById(`dryer${i}`).transition = Date.now() - dryers[i - 1].since_updated;
+                    
+                    [0, 1, 2, 3].forEach(i => {
+                        document.getElementById(`dryer${i}`).state = dryers[i].power_status;
+                        document.getElementById(`dryer${i}`).transition = Date.now() - dryers[i].since_updated;
                         document.getElementById(`dryer${i}`).classList.remove("loading");
-                    }
-                    for (let i = 1; i <= washers.length; i++) {
-                        document.getElementById(`washer${i}`).state = washers[i - 1].power_status;
-                        document.getElementById(`washer${i}`).transition = Date.now() - washers[i - 1].since_updated;
+                    });
+
+                    [0, 1, 2].forEach(i => {
+                        document.getElementById(`washer${i}`).state = washers[i].power_status;
+                        document.getElementById(`washer${i}`).transition = Date.now() - washers[i].since_updated;
                         document.getElementById(`washer${i}`).classList.remove("loading");
-                    }
+                    });
                 }
             ).catch(_ => { })
         }
@@ -578,20 +580,13 @@
                 <path class="cls-2"
                     d="M736.22,396.54H256c-22.07,0-44.23-.61-66.3,0h-.95c-7.85,0-15.37,6.9-15,15s6.59,15,15,15H669c22.07,0,44.23.61,66.3,0,.31,0,.63,0,1,0,7.85,0,15.37-6.9,15-15s-6.59-15-15-15Z" />
             </svg></a>
+        <laundry-element id="washer0" state="unknown" class="loading"></laundry-element>
         <laundry-element id="washer1" state="unknown" class="loading"></laundry-element>
         <laundry-element id="washer2" state="unknown" class="loading"></laundry-element>
-        <laundry-element id="washer3" state="unknown" class="loading"></laundry-element>
+        <laundry-element id="dryer0" state="unknown" class="loading"></laundry-element>
         <laundry-element id="dryer1" state="unknown" class="loading"></laundry-element>
         <laundry-element id="dryer2" state="unknown" class="loading"></laundry-element>
         <laundry-element id="dryer3" state="unknown" class="loading"></laundry-element>
-        <laundry-element id="dryer4" state="unknown" class="loading"></laundry-element>
-        <!-- <laundry-element id="washer1" state="unknown"></laundry-element>
-        <laundry-element id="washer2" state="broken"></laundry-element>
-        <laundry-element id="washer3" state="on"></laundry-element>
-        <laundry-element id="dryer1" state="off"></laundry-element>
-        <laundry-element id="dryer2" state="on"></laundry-element>
-        <laundry-element id="dryer3" state="off"></laundry-element>
-        <laundry-element id="dryer4" state="unknown"></laundry-element> -->
         <div id="text">
             <fieldset>
                 <legend>Notifications</legend>
@@ -713,15 +708,15 @@
         }
 
         function unselectDryers() {
-            for (let i = 1; i <= 4; i++) {
+            [0, 1, 2, 3].forEach(i => {
                 document.getElementById(`dryer${i}`).turnNotifOff();
-            }
+            });
         }
 
         function unselectWashers() {
-            for (let i = 1; i <= 3; i++) {
+            [0, 1, 2].forEach(i => {
                 document.getElementById(`washer${i}`).turnNotifOff();
-            }
+            })
         }
 
         function unselectAll() {
@@ -767,28 +762,32 @@
         });
 
         let sub = [];
-        for (let i = 1; i <= 4; i++) {
-            document.getElementById(`dryer${i}`).addNotificationToggle((p) => {
+
+        [0, 1, 2, 3].forEach(i => {
+            let index = i;
+            document.getElementById(`dryer${index}`).addNotificationToggle((p) => {
                 if (p) {
-                    sub = sub.filter((m) => m != `dryer${i}`);
+                    sub = sub.filter((m) => m != `dryer${index}`);
                 } else {
-                    sub.push(`dryer${i}`);
+                    sub.push(`dryer${index}`);
                     unselectWashers();
                     switchToSelected();
                 }
             });
-        }
-        for (let i = 1; i <= 3; i++) {
-            document.getElementById(`washer${i}`).addNotificationToggle((p) => {
+        });
+
+        [0, 1, 2].forEach(i => {
+            let index = i;
+            document.getElementById(`washer${index}`).addNotificationToggle((p) => {
                 if (p) {
-                    sub = sub.filter((m) => m != `washer${i}`);
+                    sub = sub.filter((m) => m != `washer${index}`);
                 } else {
-                    sub.push(`washer${i}`);
+                    sub.push(`washer${index}`);
                     unselectDryers();
                     switchToSelected();
                 }
             });
-        }
+        })
     </script>
 </body>
 

@@ -68,12 +68,12 @@ const styles = `
 .laundry-body {
     border-radius: 0.5em;
     width: 12em;
-    --vibrate-speed: 400ms;
-    --vibrate-distance: 0.1em;
+    --duration: 400ms;
+    --distance: 1.05;
 }
 
 .on .laundry-body {
-    animation: bouncing infinite var(--vibrate-speed) linear;
+    animation: bouncing infinite var(--duration) linear;
 }
 
 .controls {
@@ -141,13 +141,13 @@ const styles = `
         transform: scale(1, 1) translate(0, 0);
     }
     25% {
-        transform: scale(1, 1.03) translate(0, -1.5%);
+        transform: scale(1, var(--distance)) translate(0, -1.5%);
     }
     50% {
         transform: scale(1, 1) translate(0, 0);
     }
     75% {
-        transform: scale(1.03, 1) translate(0, 0);
+        transform: scale(var(--distance), 1) translate(0, 0);
     }
     to {
         transform: scale(1, 1) translate(0, 0);
