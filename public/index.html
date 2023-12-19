@@ -125,6 +125,10 @@
             }
         }
 
+        #washer0 {
+            grid-area: washer0;
+        }
+
         #washer1 {
             grid-area: washer1;
         }
@@ -133,8 +137,8 @@
             grid-area: washer2;
         }
 
-        #washer3 {
-            grid-area: washer3;
+        #dryer0 {
+            grid-area: dryer0;
         }
 
         #dryer1 {
@@ -147,10 +151,6 @@
 
         #dryer3 {
             grid-area: dryer3;
-        }
-
-        #dryer4 {
-            grid-area: dryer4;
         }
 
         #text {
@@ -167,11 +167,11 @@
 
         #container {
             display: grid;
-            grid-template-areas: "empty washer1 washer2 washer3"
+            grid-template-areas: "empty washer0 washer1 washer2"
+                "dryer0 text text text"
                 "dryer1 text text text"
                 "dryer2 text text text"
-                "dryer3 text text text"
-                "dryer4 text text text";
+                "dryer3 text text text";
             width: min-content;
             gap: 0.5em;
             margin: auto;
