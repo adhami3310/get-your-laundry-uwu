@@ -466,9 +466,9 @@
             if (type === "first") {
                 if (option === "selected") {
                     ask(kerb.value, sub.map(machine => {
-                        const machine = machine.substring(0, machine.length - 1);
+                        const machineType = machine.substring(0, machine.length - 1);
                         const index = Number.parseInt(machine.substring(machine.length - 1));
-                        return { machine, index };
+                        return { machine: machineType, index };
                     }));
                 } else if (option === "dryers") {
                     ask(kerb.value, [0, 1, 2, 3].map(index => ({ machine: "dryer", index })))
@@ -478,9 +478,9 @@
             } else {
                 if (option === "selected") {
                     sub.forEach(machine => {
-                        const machine = machine.substring(0, machine.length - 1);
+                        const machineType = machine.substring(0, machine.length - 1);
                         const index = Number.parseInt(machine.substring(machine.length - 1));
-                        ask(kerb.value, [{ machine, index }]);
+                        ask(kerb.value, [{ machine: machineType, index }]);
                     });
                 } else if (option === "dryers") {
                     [0, 1, 2, 3].forEach(index => {
