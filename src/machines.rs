@@ -277,6 +277,9 @@ impl<const T: usize> Machines<T> {
     }
 
     pub fn add_request(&self, request: EmailRequest) {
+        if request.indicies.is_empty() {
+            return;
+        }
         let mut email_request = self.email_requests.lock().unwrap();
         email_request.push(request);
     }
