@@ -238,21 +238,22 @@ impl<const T: usize> Machines<T> {
                                     )
                                     .build();
 
-                                    for kerb in to_send {
-                                        let email = email_builder
-                                            .clone()
-                                            .to(lettre::message::Mailbox::new(
-                                                None,
-                                                lettre::Address::new(kerb, "mit.edu").unwrap(),
-                                            ))
-                                            .body(lettre::message::Body::new(vec![]))
-                                            .unwrap();
-
-                                        // Send the email
-                                        if let Err(e) = lettre::Transport::send(&mailer, &email) {
-                                            println!("{}", e);
-                                        }
-                                    }
+                                    to_send
+                                        .into_iter()
+                                        .flat_map(|kerb| lettre::Address::new(kerb, "mit.edu"))
+                                        .flat_map(|addr| {
+                                            email_builder
+                                                .clone()
+                                                .to(lettre::message::Mailbox::new(None, addr))
+                                                .body(lettre::message::Body::new(vec![]))
+                                        })
+                                        .for_each(|email| {
+                                            // Send the email
+                                            if let Err(e) = lettre::Transport::send(&mailer, &email)
+                                            {
+                                                println!("{}", e);
+                                            }
+                                        });
 
                                     *requests = new_requests;
                                 }
