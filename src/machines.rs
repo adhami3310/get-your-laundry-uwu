@@ -53,6 +53,15 @@ pub struct Thresholds {
     pub cutoff: u64,
 }
 
+impl Thresholds {
+    pub fn with_status(status: PowerStatus) -> Self {
+        Self {
+            forced_state: Some(status),
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for Thresholds {
     fn default() -> Self {
         Self {

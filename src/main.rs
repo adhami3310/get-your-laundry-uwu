@@ -8,7 +8,7 @@ use axum::{
     Json, Router,
 };
 use itertools::Itertools;
-use machines::{EmailRequest, Machines};
+use machines::{EmailRequest, Machines, Thresholds};
 use serde::{Deserialize, Serialize};
 use tower_http::services::ServeDir;
 
@@ -29,7 +29,11 @@ async fn main() {
             "Washer",
             "/dev/ttyUSB1",
             9600,
-            [Default::default(), Default::default(), Default::default()],
+            [
+                Thresholds::with_status(machines::PowerStatus::Broken),
+                Thresholds::default(),
+                Thresholds::default(),
+            ],
         )
         .into(),
         dryers: Machines::new(
@@ -37,10 +41,10 @@ async fn main() {
             "/dev/ttyUSB0",
             9600,
             [
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                Default::default(),
+                Thresholds::default(),
+                Thresholds::default(),
+                Thresholds::default(),
+                Thresholds::default(),
             ],
         )
         .into(),
